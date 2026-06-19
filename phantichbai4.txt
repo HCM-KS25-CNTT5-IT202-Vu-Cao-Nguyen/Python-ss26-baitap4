@@ -1,0 +1,125 @@
+1. PHÂN TÍCH BÀI TOÁN (I/O)
+
+
+INPUT:
+- Thông tin khởi tạo sinh vật:
+    • name       : chuỗi ký tự (tên sinh vật)
+    • bonus_atk  : số nguyên (chỉ số tấn công, dùng cho Pet & Dragon)
+    • bonus_speed: số nguyên (chỉ số tốc độ, dùng cho Mount & Dragon)
+- Hành động lai tạo: toán tử + giữa 2 object cùng loài
+
+OUTPUT:
+- Object sinh vật mới (khi lai tạo thành công):
+    • Tên = Tên 1 + " " + Tên 2
+    • level = level cũ + 1
+    • Chỉ số = tổng chỉ số 2 con cũ
+- Thông báo console (khi unleash_skill()):
+    • Pet    : "[Tên] gầm gừ: Tấn công kẻ thù, gây X sát thương!"
+    • Mount  : "[Tên] hí vang: Tăng tốc độ di chuyển thêm X điểm!"
+    • Dragon : in cả 2 dòng trên
+- Lỗi TypeError khi vi phạm bẫy 1 hoặc bẫy 2
+
+
+2. SƠ ĐỒ CẤU TRÚC KẾ THỪA
+
+
+         ABC (Python built-in)
+          │
+          │ kế thừa
+          ▼
+       Companion  (Abstract Base Class)
+       - name: str
+       - level: int = 1
+       ─────────────────────────────────
+       + unleash_skill()  [abstract]
+       + _merge(other)    [abstract]
+       + __add__(other)   → kiểm tra type, gọi _merge
+          │
+    ┌─────┴──────┐
+    │            │
+    ▼            ▼
+  Pet          Mount
+  - bonus_atk  - bonus_speed
+  ───────────  ────────────
+  + unleash_skill()
+  + _merge(other)
+    │            │
+    └─────┬──────┘
+          │ đa kế thừa
+          ▼
+        Dragon
+        - bonus_atk  (từ Pet)
+        - bonus_speed (từ Mount)
+        ─────────────────────
+        + unleash_skill()  → gọi cả 2 kỹ năng
+        + _merge(other)
+
+MRO (Method Resolution Order) của Dragon:
+Dragon → Pet → Mount → Companion → ABC → object
+
+
+3. ĐỀ XUẤT GIẢI PHÁP
+
+
+Giải pháp Bẫy 1 — Chặn khởi tạo Companion trực tiếp:
+  Cho Companion kế thừa ABC và gắn @abstractmethod cho cả
+  unleash_skill() và _merge(). Python sẽ tự động ném TypeError
+  nếu bất kỳ ai cố gọi Companion("Test") vì lớp này còn
+  abstract method chưa được implement.
+
+Giải pháp Bẫy 2 — Chặn lai tạo khác loài:
+  Trong __add__ tại lớp Companion, kiểm tra:
+      if type(self) != type(other):
+          raise TypeError("Chỉ có thể lai tạo 2 sinh vật cùng loài!")
+  Dùng type() thay vì isinstance() vì isinstance(dragon, Pet) = True,
+  nên nếu dùng isinstance sẽ cho phép lai Dragon với Pet — sai logic.
+  type() so sánh đúng class, không tính kế thừa.
+
+Giải pháp Bẫy 3 — Dragon không mất chỉ số (MRO + kwargs):
+  Dragon.__init__ nhận cả bonus_atk lẫn bonus_speed, đóng gói vào
+  **kwargs và truyền cho super().__init__(). Python theo MRO chạy
+  lần lượt: Pet.__init__ nhặt bonus_atk ra khỏi kwargs, rồi
+  Mount.__init__ nhặt bonus_speed. Companion.__init__ nhận name.
+  Không con nào bị mất chỉ số vì kwargs được truyền xuyên suốt
+  chuỗi kế thừa.
+
+
+4. CÁC BƯỚC TRIỂN KHAI
+
+
+Bước 1: Import ABC và abstractmethod từ thư viện abc.
+
+Bước 2: Định nghĩa Companion(ABC):
+  - __init__(name, **kwargs): gán name, level=1, gọi super(**kwargs)
+  - @abstractmethod unleash_skill()
+  - @abstractmethod _merge(other)
+  - __add__(other): kiểm tra type → gọi _merge hoặc raise TypeError
+
+Bước 3: Định nghĩa Pet(Companion) và Mount(Companion):
+  - Pet.__init__(name, bonus_atk, **kwargs): gọi super, gán bonus_atk
+  - Mount.__init__(name, bonus_speed, **kwargs): gọi super, gán bonus_speed
+  - Mỗi lớp override unleash_skill() theo kỹ năng riêng
+  - Mỗi lớp implement _merge() → tạo object cùng loại, cộng chỉ số,
+    tăng level
+
+Bước 4: Định nghĩa Dragon(Pet, Mount):
+  - __init__(name, bonus_atk, bonus_speed): truyền cả 2 vào super()
+    không dùng **kwargs tại đây để code rõ ràng hơn
+  - Override unleash_skill() → in cả 2 dòng output
+  - Override _merge() → tạo Dragon mới, cộng cả atk lẫn speed
+
+Bước 5: Viết block if __name__ == "__main__": để demo chống bẫy
+  và vòng lặp menu chương trình chính.
+
+5. PHÂN TÍCH ĐA HÌNH (POLYMORPHISM)
+
+
+Khi duyệt mảng equipped = [p3, m1, d1] và gọi:
+    for companion in equipped:
+        companion.unleash_skill()
+
+Python dispatch đến đúng implementation của từng class tại runtime.
+Không cần if/else để kiểm tra loại sinh vật. Đây là Đa hình:
+cùng một lời gọi unleash_skill(), mỗi object tự biết mình phải
+làm gì. Khi thêm loài mới (ví dụ Fairy, Golem), chỉ cần tạo
+lớp con và implement unleash_skill() — vòng lặp không cần sửa.
